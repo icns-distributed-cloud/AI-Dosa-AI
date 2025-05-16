@@ -1,0 +1,12 @@
+openai==0.28
+langchain
+chromadb
+faiss-cpu
+langchain-community
+tiktoken
+fastembed
+pymysql
+uvicorn
+openai-whisper
+python-multipart
+ffmpeg
