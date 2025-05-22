@@ -220,9 +220,9 @@ async def negative_response(query: QueryRequest):
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
     return JSONResponse(content={"response": response_text})
 
-@app.post("/api/bot/moya")
+@app.post("/api/bot/saju")
 async def negative_response(query: QueryRequest):
-    prompt = "이전에 했던 대화내용을 참고해서 흐름에 맞춘 자연스러운 대화를 이어나가주고 한줄로 간결하게 대답해줘:\n\n"
+    prompt = "당신은 사주 분석 전문가입니다. 사용자의 생시를 참고해서 사주를 분석해주세요. 어떤 기운이 강하고 약한지만 알려주세요. 그리고 한줄로 간결하게 대답해줘:\n\n"
     result = query_openai(prompt, query.script)
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
     return JSONResponse(content={"response": response_text})
@@ -276,39 +276,35 @@ async def loader_response(query: LoaderRequest):
 
     return JSONResponse(content={"response": llm_response})
 
+@app.post("/api/bot/moya")
+async def summary_response(query: QueryRequest):
+    prompt = """    
+    아래는 이전 대화에서 나온 여러 대화 내용들을 종합한 스크립트입니다.  
+    이 내용을 바탕으로 회의의 핵심 내용을 **한 문장**으로 요약해주세요.
+
+    - 너무 추상적이거나 일반적인 문장은 피해주세요.  
+    - 구체적인 결론, 제안, 인사이트를 포함해서 한 문장으로 전달해주세요.  
+    - 스크립트의 원문 문장을 복사하지 말고, 요약만 해주세요.  
+    - 심을 전달한다는 느낌으로 말해주세요.
+
+    이전 대화 스크립트:
+    \"\"\"
+    {query.script}
+    \"\"\"
+
+    대화 요약:
+    """    
+    result = query_openai(prompt, query.script)
+    response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
+    return JSONResponse(content={"response": response_text})
+
 @app.post("/api/bot/food")
-async def mbti_response(query: QueryRequest):
-    print("[API] /api/bot/food 호출됨")
-    start_time = time.time()
+async def summary_response(query: QueryRequest):
+    prompt = """
+    당신은 사주 관련 음식 분석 전문가입니다.
 
-    # 벡터DB 로딩 또는 생성
-    if os.path.exists(MBTI_VECTOR_DB_PATH):
-        vectorstore = FAISS.load_local(MBTI_VECTOR_DB_PATH, FastEmbedEmbeddings(), allow_dangerous_deserialization=True)
-    else:
-        print("[MBTI] 최초 벡터 DB 생성")
-        loader = TextLoader(MBTI_DATA_PATH)
-        documents = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-        split_docs = text_splitter.split_documents(documents)
-        vectorstore = FAISS.from_documents(split_docs, FastEmbedEmbeddings())
-        vectorstore.save_local(MBTI_VECTOR_DB_PATH)
-
-    # 유사 문서 검색
-    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-    docs = retriever.get_relevant_documents(query.script)
-    similar_context = "\n\n".join([doc.page_content for doc in docs])
-
-    # 프롬프트 생성
-    prompt = f"""
-    당신은 전통 사주에 따른 음식 분석 전문가입니다.
-
-    다음은 사용자가 음성으로 제공한 생년월일 및 태어난 시간 정보입니다:
-    "{query.script}"
-
-    아래는 사주에서 사용하는 오행(목, 화, 토, 금, 수)의 기운, 의미 및 기운데 따른 음식 추천 설명입니다:
-    "{similar_context}"
-
-    이 정보를 바탕으로 사용자의 기운을 분석하고 아래 조건에 맞춰 짧게 설명해주세요:
+    아래는 이전 대화에서 나온 여러 대화 내용들을 종합한 스크립트입니다.  
+    이 내용을 바탕으로 회의의 핵심 내용을 **한 문장**으로 요약해주세요.
 
     - 1~2문장 이내의 짧고 자연스러운 대화체로 말할 것
     - 사용자에게 말하듯 부드럽고 친근한 말투
@@ -316,118 +312,38 @@ async def mbti_response(query: QueryRequest):
     - 그에 따른 간단한 음식 추천 제공
     - 생년월일 숫자 등은 언급하지 말고, 해석만 제공
 
-    형식 설명:
-    - "어떤 기운이 강한지 + 해당 성향 + 기운에 따른 음식 추천 요약을 자연스럽게 연결해서 말해주세요.
-    """
+    이전 대화 스크립트:
+    \"\"\"
+    {query.script}
+    \"\"\"
 
-    print(f"vectorDB 처리 시간: {time.time() - start_time:.2f}초")
-
-    result = query_openai(prompt, query.script)
-    response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
-    return JSONResponse(content={"response": response_text})
-
-@app.post("/api/bot/saju")
-async def saju_response(query: QueryRequest):
-    print("[API] /api/bot/saju 호출됨")
-    start_time = time.time()
-
-    # 벡터 DB 생성 또는 로드
-    SAJU_VECTOR_DB_PATH = "./vector_db_saju"
-    SAJU_DATA_PATH = "./saju_data.txt"
-
-    if os.path.exists(SAJU_VECTOR_DB_PATH):
-        vectorstore = FAISS.load_local(SAJU_VECTOR_DB_PATH, FastEmbedEmbeddings(), allow_dangerous_deserialization=True)
-    else:
-        print("[SAJU] 새로운 사주 벡터 DB 생성 중...")
-        loader = TextLoader(SAJU_DATA_PATH)
-        documents = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-        split_docs = text_splitter.split_documents(documents)
-        vectorstore = FAISS.from_documents(split_docs, FastEmbedEmbeddings())
-        vectorstore.save_local(SAJU_VECTOR_DB_PATH)
-
-    # RAG로 유사한 내용 추출
-    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-    docs = retriever.get_relevant_documents(query.script)
-    similar_context = "\n\n".join([doc.page_content for doc in docs])
-
-    # 프롬프트 구성
-    prompt = f"""
-    당신은 전통 사주 분석 전문가입니다.
-
-    다음은 사용자가 음성으로 제공한 생년월일 및 태어난 시간 정보입니다:
-    "{query.script}"
-
-    아래는 사주에서 사용하는 오행(목, 화, 토, 금, 수)의 기운 및 의미 설명입니다:
-    "{similar_context}"
-
-    이 정보를 바탕으로 사용자의 기운을 분석하고 아래 조건에 맞춰 짧게 설명해주세요:
-
-    - 1~2문장 이내의 짧고 자연스러운 대화체로 말할 것
-    - 사용자에게 말하듯 부드럽고 친근한 말투
-    - 음양오행 중 어떤 기운이 강한지만 알려줌
-    - 그에 따른 간단한 조언(음식이나 행동 등)은 알려주지 않는다
-    - 생년월일 숫자 등은 언급하지 말고, 해석만 제공
-
-    형식 설명:
-    - "어떤 기운이 강한지 + 해당 성향 요약을 자연스럽게 연결해서 말해주세요.
-    """
-
-    print(f"vectorDB 처리 시간: {time.time() - start_time:.2f}초")
-
+    대화 요약:
+    """    
     result = query_openai(prompt, query.script)
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
     return JSONResponse(content={"response": response_text})
 
 @app.post("/api/bot/gym")
-async def saju_response(query: QueryRequest):
-    print("[API] /api/bot/gym 호출됨")
-    start_time = time.time()
-
-    # 벡터 DB 생성 또는 로드
-    SAJU_VECTOR_DB_PATH = "./vector_db_saju2"
-    SAJU_DATA_PATH = "./saju_health.txt"
-
-    if os.path.exists(SAJU_VECTOR_DB_PATH):
-        vectorstore = FAISS.load_local(SAJU_VECTOR_DB_PATH, FastEmbedEmbeddings(), allow_dangerous_deserialization=True)
-    else:
-        print("[SAJU] 새로운 사주 벡터 DB 생성 중...")
-        loader = TextLoader(SAJU_DATA_PATH)
-        documents = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-        split_docs = text_splitter.split_documents(documents)
-        vectorstore = FAISS.from_documents(split_docs, FastEmbedEmbeddings())
-        vectorstore.save_local(SAJU_VECTOR_DB_PATH)
-
-    # RAG로 유사한 내용 추출
-    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-    docs = retriever.get_relevant_documents(query.script)
-    similar_context = "\n\n".join([doc.page_content for doc in docs])
-
-    # 프롬프트 구성
-    prompt = f"""
-    당신은 전통 사주에 따른 운동 분석 전문가입니다.
-
-    다음은 사용자가 음성으로 제공한 생년월일 및 태어난 시간 정보입니다:
-    "{query.script}"
-
-    아래는 사주에서 사용하는 오행(목, 화, 토, 금, 수)의 기운 및 의미와 그에 따른 추천 운동 설명입니다:
-    "{similar_context}"
-
-    이 정보를 바탕으로 사용자의 기운을 분석하고 아래 조건에 맞춰 짧게 설명해주세요:
+async def summary_response(query: QueryRequest):
+    prompt = """
+    당신은 사주 관련 운동 분석 전문가입니다.
+    
+    아래는 이전 대화에서 나온 여러 대화 내용들을 종합한 스크립트입니다.  
+    이 내용을 바탕으로 회의의 핵심 내용을 **한 문장**으로 요약해주세요.
 
     - 1~2문장 이내의 짧고 자연스러운 대화체로 말할 것
     - 사용자에게 말하듯 부드럽고 친근한 말투
-    - 음양오행 중 어떤 기운이 강한지간략하게 언급
-    - 그에 따른 간단한 운동 추천 및 피해야할 운동 정보 제공 
+    - 음양오행 중 어떤 기운이 강한지 간단히 언급
+    - 그에 따른 추천 및 피해야 할 운동 정보 제공
     - 생년월일 숫자 등은 언급하지 말고, 해석만 제공
 
-    형식 설명:
-    - "어떤 기운이 강한지 + 해당 성향 요약 + 기운에 따른 추천 및 피해야할 운동을 자연스럽게 연결해서 말해주세요.
-    """
+    이전 대화 스크립트:
+    \"\"\"
+    {query.script}
+    \"\"\"
 
-    print(f"vectorDB 처리 시간: {time.time() - start_time:.2f}초")
-
+    대화 요약:
+    """    
     result = query_openai(prompt, query.script)
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
     return JSONResponse(content={"response": response_text})
@@ -436,5 +352,3 @@ async def saju_response(query: QueryRequest):
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8080, log_level="debug")
-
-

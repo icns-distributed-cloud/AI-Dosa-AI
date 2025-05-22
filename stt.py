@@ -195,7 +195,7 @@ async def transcribe_positive(
     return {"transcription": text, "llm_response": llm_response}
 
 @app.post("/api/moya")
-async def transcribe_positive(
+async def transcribe_summary(
     file: UploadFile = File(...),
     meeting_id: int = Form(...),
     db: Session = Depends(get_db)
@@ -218,14 +218,31 @@ async def transcribe_positive(
     end_time = time.time() #stt 종료 시간
     processing_time = end_time - start_time #걸린 시간
     print(f"Request time: {processing_time} seconds")
-    
+        
     save_transcription(output_dir, file.filename, text)
 
-    llm_response = send_to_llm(LLM_API_URLS["MOYA"], text, meeting_id)
+    # 모든 .txt 병합
+    merged_text = ""
+    print(f"[MOYA] 텍스트 병합 시작 - 디렉토리: {output_dir}")
+    for filename in os.listdir(output_dir):
+        if filename.endswith(".txt"):
+            full_path = os.path.join(output_dir, filename)
+            try:
+                with open(full_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    merged_text += content.strip() + "\n\n"
+                    print(f"[MOYA] 병합된 파일: {filename} (길이: {len(content)}자)")
+            except Exception as e:
+                print(f"[WARNING] 병합 실패: {filename} - {e}")
+
+    print(f"[MOYA] 최종 병합된 텍스트 길이: {len(merged_text)}자")
+    print(f"[MOYA] 병합된 전체 텍스트: {merged_text}")
+
+    llm_response = send_to_llm(LLM_API_URLS["MOYA"], merged_text.strip(), meeting_id)
     
     new_bot_entry.content = llm_response
     db.commit()
-    
+
     return {"transcription": text, "llm_response": llm_response}
 
 @app.post("/api/negative")
@@ -358,38 +375,55 @@ async def transcribe_loader(
     return {"note_ids": note_ids[0], "response": llm_response}
 
 @app.post("/api/food")
-async def transcribe_mbti(
+async def transcribe_summary(
     file: UploadFile = File(...),
     meeting_id: int = Form(...),
     db: Session = Depends(get_db)
 ):
 
     file_path, output_dir = save_file_and_dirs(file, meeting_id)
-
+    
     new_bot_entry = Bot(
         meeting_id=meeting_id,
         type="FOOD",
-        content="FOOD 분석 중...",
+        content="음식 분석중",
         created_at=func.now()
     )
     db.add(new_bot_entry)
     db.commit()
     db.refresh(new_bot_entry)
-
+    
     start_time = time.time() #stt 시작 시간
-    stt_text = whisper_api_transcribe(file_path)
-    end_time = time.time()
-    print(f"STT 처리 시간: {end_time - start_time:.2f}초")
+    text = whisper_api_transcribe(file_path)
+    end_time = time.time() #stt 종료 시간
+    processing_time = end_time - start_time #걸린 시간
+    print(f"Request time: {processing_time} seconds")
+        
+    save_transcription(output_dir, file.filename, text)
 
-    save_transcription(output_dir, file.filename, stt_text)
+    # 모든 .txt 병합
+    merged_text = ""
+    print(f"[FOOD] 텍스트 병합 시작 - 디렉토리: {output_dir}")
+    for filename in os.listdir(output_dir):
+        if filename.endswith(".txt"):
+            full_path = os.path.join(output_dir, filename)
+            try:
+                with open(full_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    merged_text += content.strip() + "\n\n"
+                    print(f"[FOOD] 병합된 파일: {filename} (길이: {len(content)}자)")
+            except Exception as e:
+                print(f"[WARNING] 병합 실패: {filename} - {e}")
 
-    # MBTI 분석 요청
-    llm_response = send_to_llm(LLM_API_URLS["FOOD"], stt_text, meeting_id)
+    print(f"[FOOD] 최종 병합된 텍스트 길이: {len(merged_text)}자")
+    print(f"[FOOD] 병합된 전체 텍스트: {merged_text}")
 
+    llm_response = send_to_llm(LLM_API_URLS["FOOD"], merged_text.strip(), meeting_id)
+    
     new_bot_entry.content = llm_response
     db.commit()
 
-    return {"transcription": stt_text, "llm_response": llm_response}
+    return {"transcription": text, "llm_response": llm_response}
 
 @app.post("/api/saju")
 async def transcribe_saju(
@@ -425,37 +459,55 @@ async def transcribe_saju(
     return {"transcription": stt_text, "llm_response": llm_response}
 
 @app.post("/api/gym")
-async def transcribe_saju(
+async def transcribe_summary(
     file: UploadFile = File(...),
     meeting_id: int = Form(...),
     db: Session = Depends(get_db)
 ):
 
     file_path, output_dir = save_file_and_dirs(file, meeting_id)
-
+    
     new_bot_entry = Bot(
         meeting_id=meeting_id,
         type="GYM",
-        content="운동 분석중...",
+        content="운동 분석중",
         created_at=func.now()
     )
     db.add(new_bot_entry)
     db.commit()
     db.refresh(new_bot_entry)
-
+    
     start_time = time.time() #stt 시작 시간
-    stt_text = whisper_api_transcribe(file_path)
-    end_time = time.time()
-    print(f"STT 처리 시간: {end_time - start_time:.2f}초")
+    text = whisper_api_transcribe(file_path)
+    end_time = time.time() #stt 종료 시간
+    processing_time = end_time - start_time #걸린 시간
+    print(f"Request time: {processing_time} seconds")
         
-    save_transcription(output_dir, file.filename, stt_text)
+    save_transcription(output_dir, file.filename, text)
 
-    llm_response = send_to_llm(LLM_API_URLS["GYM"], stt_text, meeting_id)
+    # 모든 .txt 병합
+    merged_text = ""
+    print(f"[GYM] 텍스트 병합 시작 - 디렉토리: {output_dir}")
+    for filename in os.listdir(output_dir):
+        if filename.endswith(".txt"):
+            full_path = os.path.join(output_dir, filename)
+            try:
+                with open(full_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    merged_text += content.strip() + "\n\n"
+                    print(f"[GYM] 병합된 파일: {filename} (길이: {len(content)}자)")
+            except Exception as e:
+                print(f"[WARNING] 병합 실패: {filename} - {e}")
 
+    print(f"[GYM] 최종 병합된 텍스트 길이: {len(merged_text)}자")
+    print(f"[GYM] 병합된 전체 텍스트: {merged_text}")
+
+    llm_response = send_to_llm(LLM_API_URLS["GYM"], merged_text.strip(), meeting_id)
+    
     new_bot_entry.content = llm_response
     db.commit()
 
-    return {"transcription": stt_text, "llm_response": llm_response}
+    return {"transcription": text, "llm_response": llm_response}
 
 @app.post("/api/v1/endmeeting")
 async def end_meeting(
