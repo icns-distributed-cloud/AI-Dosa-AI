@@ -276,9 +276,9 @@ async def loader_response(query: LoaderRequest):
 
     return JSONResponse(content={"response": llm_response})
 
-@app.post("/api/bot/mbti")
+@app.post("/api/bot/food")
 async def mbti_response(query: QueryRequest):
-    print("[API] /api/bot/mbti 호출됨")
+    print("[API] /api/bot/food 호출됨")
 
     # 벡터DB 로딩 또는 생성
     if os.path.exists(MBTI_VECTOR_DB_PATH):
@@ -299,27 +299,24 @@ async def mbti_response(query: QueryRequest):
 
     # 프롬프트 생성
     prompt = f"""
-    당신은 MBTI 성격 분석에 능한 전문가입니다.
+    당신은 전통 사주에 따른 음식 분석 전문가입니다.
 
-    다음은 사용자와 나눈 대화 내용입니다:
+    다음은 사용자가 음성으로 제공한 생년월일 및 태어난 시간 정보입니다:
+    "{query.script}"
 
-    \"\"\"{query.script}\"\"\"
+    아래는 사주에서 사용하는 오행(목, 화, 토, 금, 수)의 기운, 의미 및 기운데 따른 음식 추천 설명입니다:
+    "{similar_context}"
 
-    또한 아래는 MBTI 각 유형에 대한 간단한 성격 설명입니다:
+    이 정보를 바탕으로 사용자의 기운을 분석하고 아래 조건에 맞춰 짧게 설명해주세요:
 
-    {similar_context}
+    - 1~2문장 이내의 짧고 자연스러운 대화체로 말할 것
+    - 사용자에게 말하듯 부드럽고 친근한 말투
+    - 음양오행 중 어떤 기운이 강한지 간단히 언급
+    - 그에 따른 간단한 음식 추천 제공
+    - 생년월일 숫자 등은 언급하지 말고, 해석만 제공
 
-    지금까지의 대화를 바탕으로 사용자의 MBTI 유형을 추론해주세요.  
-    결과는 아래 기준에 맞춰 간결하고 자연스럽게 말해주세요:
-
-    - MBTI 4글자 유형을 정확하게 제시
-    - 해당 유형이 어떤 성격을 가지는지 1~2문장으로 요약
-    - 너무 딱딱하지 않게, 사람에게 말하듯 자연스럽게 말해줘
-
-    예:  
-    "당신의 MBTI는 ENFP입니다! 열정적이고 창의적인 성격으로, 사람들과 소통하는 걸 좋아하죠."
-
-    ※ 대화 내용 원문을 복사하거나 언급하지 마세요.
+    형식 설명:
+    - "어떤 기운이 강한지 + 해당 성향 + 기운에 따른 음식 추천 요약을 자연스럽게 연결해서 말해주세요.
     """
 
 
@@ -366,11 +363,63 @@ async def saju_response(query: QueryRequest):
 
     - 1~2문장 이내의 짧고 자연스러운 대화체로 말할 것
     - 사용자에게 말하듯 부드럽고 친근한 말투
-    - 음양오행 중 어떤 기운이 강한지와, 그에 따른 간단한 조언(음식이나 행동 등)을 포함
+    - 음양오행 중 어떤 기운이 강한지만 알려줌
+    - 그에 따른 간단한 조언(음식이나 행동 등)은 알려주지 않는다
     - 생년월일 숫자 등은 언급하지 말고, 해석만 제공
 
     형식 설명:
-    - "어떤 기운이 강한지 + 해당 성향 요약 + 실생활 조언"을 자연스럽게 연결해서 말해주세요.
+    - "어떤 기운이 강한지 + 해당 성향 요약을 자연스럽게 연결해서 말해주세요.
+    """
+
+
+    result = query_openai(prompt, query.script)
+    response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
+    return JSONResponse(content={"response": response_text})
+
+@app.post("/api/bot/gym")
+async def saju_response(query: QueryRequest):
+    print("[API] /api/bot/gym 호출됨")
+
+    # 벡터 DB 생성 또는 로드
+    SAJU_VECTOR_DB_PATH = "./vector_db_saju2"
+    SAJU_DATA_PATH = "./saju_health.txt"
+
+    if os.path.exists(SAJU_VECTOR_DB_PATH):
+        vectorstore = FAISS.load_local(SAJU_VECTOR_DB_PATH, FastEmbedEmbeddings(), allow_dangerous_deserialization=True)
+    else:
+        print("[SAJU] 새로운 사주 벡터 DB 생성 중...")
+        loader = TextLoader(SAJU_DATA_PATH)
+        documents = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+        split_docs = text_splitter.split_documents(documents)
+        vectorstore = FAISS.from_documents(split_docs, FastEmbedEmbeddings())
+        vectorstore.save_local(SAJU_VECTOR_DB_PATH)
+
+    # RAG로 유사한 내용 추출
+    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+    docs = retriever.get_relevant_documents(query.script)
+    similar_context = "\n\n".join([doc.page_content for doc in docs])
+
+    # 프롬프트 구성
+    prompt = f"""
+    당신은 전통 사주에 따른 운동 분석 전문가입니다.
+
+    다음은 사용자가 음성으로 제공한 생년월일 및 태어난 시간 정보입니다:
+    "{query.script}"
+
+    아래는 사주에서 사용하는 오행(목, 화, 토, 금, 수)의 기운 및 의미와 그에 따른 추천 운동 설명입니다:
+    "{similar_context}"
+
+    이 정보를 바탕으로 사용자의 기운을 분석하고 아래 조건에 맞춰 짧게 설명해주세요:
+
+    - 1~2문장 이내의 짧고 자연스러운 대화체로 말할 것
+    - 사용자에게 말하듯 부드럽고 친근한 말투
+    - 음양오행 중 어떤 기운이 강한지간략하게 언급
+    - 그에 따른 간단한 운동 추천 및 피해야할 운동 정보 제공 
+    - 생년월일 숫자 등은 언급하지 말고, 해석만 제공
+
+    형식 설명:
+    - "어떤 기운이 강한지 + 해당 성향 요약 + 기운에 따른 추천 및 피해야할 운동을 자연스럽게 연결해서 말해주세요.
     """
 
 

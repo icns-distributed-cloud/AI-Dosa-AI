@@ -129,8 +129,9 @@ LLM_API_URLS = {
     "SUMMARY": f"{LLM_IP}/api/bot/summary",
     "LOADER": f"{LLM_IP}/api/bot/loader",
     "END": f"{LLM_IP}/api/bot/endmeeting",
-    "MBTI": f"{LLM_IP}/api/bot/mbti",
+    "FOOD": f"{LLM_IP}/api/bot/food",
     "SAJU": f"{LLM_IP}/api/bot/saju",
+    "GYM": f"{LLM_IP}/api/bot/gym",
     "MOYA": f"{LLM_IP}/api/bot/moya",
 }
 
@@ -356,7 +357,7 @@ async def transcribe_loader(
 
     return {"note_ids": note_ids[0], "response": llm_response}
 
-@app.post("/api/mbti")
+@app.post("/api/food")
 async def transcribe_mbti(
     file: UploadFile = File(...),
     meeting_id: int = Form(...),
@@ -367,8 +368,8 @@ async def transcribe_mbti(
 
     new_bot_entry = Bot(
         meeting_id=meeting_id,
-        type="MBTI",
-        content="MBTI 분석 중...",
+        type="FOOD",
+        content="FOOD 분석 중...",
         created_at=func.now()
     )
     db.add(new_bot_entry)
@@ -379,7 +380,7 @@ async def transcribe_mbti(
     save_transcription(output_dir, file.filename, stt_text)
 
     # MBTI 분석 요청
-    llm_response = send_to_llm(LLM_API_URLS["MBTI"], stt_text, meeting_id)
+    llm_response = send_to_llm(LLM_API_URLS["FOOD"], stt_text, meeting_id)
 
     new_bot_entry.content = llm_response
     db.commit()
@@ -409,6 +410,35 @@ async def transcribe_saju(
     save_transcription(output_dir, file.filename, stt_text)
 
     llm_response = send_to_llm(LLM_API_URLS["SAJU"], stt_text, meeting_id)
+
+    new_bot_entry.content = llm_response
+    db.commit()
+
+    return {"transcription": stt_text, "llm_response": llm_response}
+
+@app.post("/api/gym")
+async def transcribe_saju(
+    file: UploadFile = File(...),
+    meeting_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+
+    file_path, output_dir = save_file_and_dirs(file, meeting_id)
+
+    new_bot_entry = Bot(
+        meeting_id=meeting_id,
+        type="GYM",
+        content="운동 분석중...",
+        created_at=func.now()
+    )
+    db.add(new_bot_entry)
+    db.commit()
+    db.refresh(new_bot_entry)
+
+    stt_text = whisper_api_transcribe(file_path)
+    save_transcription(output_dir, file.filename, stt_text)
+
+    llm_response = send_to_llm(LLM_API_URLS["GYM"], stt_text, meeting_id)
 
     new_bot_entry.content = llm_response
     db.commit()
