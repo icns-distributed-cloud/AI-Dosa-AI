@@ -279,6 +279,7 @@ async def loader_response(query: LoaderRequest):
 @app.post("/api/bot/food")
 async def mbti_response(query: QueryRequest):
     print("[API] /api/bot/food 호출됨")
+    start_time = time.time()
 
     # 벡터DB 로딩 또는 생성
     if os.path.exists(MBTI_VECTOR_DB_PATH):
@@ -319,7 +320,7 @@ async def mbti_response(query: QueryRequest):
     - "어떤 기운이 강한지 + 해당 성향 + 기운에 따른 음식 추천 요약을 자연스럽게 연결해서 말해주세요.
     """
 
-
+    print(f"vectorDB 처리 시간: {time.time() - start_time:.2f}초")
 
     result = query_openai(prompt, query.script)
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
@@ -328,6 +329,7 @@ async def mbti_response(query: QueryRequest):
 @app.post("/api/bot/saju")
 async def saju_response(query: QueryRequest):
     print("[API] /api/bot/saju 호출됨")
+    start_time = time.time()
 
     # 벡터 DB 생성 또는 로드
     SAJU_VECTOR_DB_PATH = "./vector_db_saju"
@@ -371,6 +373,7 @@ async def saju_response(query: QueryRequest):
     - "어떤 기운이 강한지 + 해당 성향 요약을 자연스럽게 연결해서 말해주세요.
     """
 
+    print(f"vectorDB 처리 시간: {time.time() - start_time:.2f}초")
 
     result = query_openai(prompt, query.script)
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')
@@ -379,6 +382,7 @@ async def saju_response(query: QueryRequest):
 @app.post("/api/bot/gym")
 async def saju_response(query: QueryRequest):
     print("[API] /api/bot/gym 호출됨")
+    start_time = time.time()
 
     # 벡터 DB 생성 또는 로드
     SAJU_VECTOR_DB_PATH = "./vector_db_saju2"
@@ -422,6 +426,7 @@ async def saju_response(query: QueryRequest):
     - "어떤 기운이 강한지 + 해당 성향 요약 + 기운에 따른 추천 및 피해야할 운동을 자연스럽게 연결해서 말해주세요.
     """
 
+    print(f"vectorDB 처리 시간: {time.time() - start_time:.2f}초")
 
     result = query_openai(prompt, query.script)
     response_text = result.get("response", "응답을 가져올 수 없습니다.").strip('"')

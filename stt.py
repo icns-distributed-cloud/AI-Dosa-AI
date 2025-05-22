@@ -376,7 +376,11 @@ async def transcribe_mbti(
     db.commit()
     db.refresh(new_bot_entry)
 
+    start_time = time.time() #stt 시작 시간
     stt_text = whisper_api_transcribe(file_path)
+    end_time = time.time()
+    print(f"STT 처리 시간: {end_time - start_time:.2f}초")
+
     save_transcription(output_dir, file.filename, stt_text)
 
     # MBTI 분석 요청
@@ -406,7 +410,11 @@ async def transcribe_saju(
     db.commit()
     db.refresh(new_bot_entry)
 
+    start_time = time.time() #stt 시작 시간
     stt_text = whisper_api_transcribe(file_path)
+    end_time = time.time()
+    print(f"STT 처리 시간: {end_time - start_time:.2f}초")
+
     save_transcription(output_dir, file.filename, stt_text)
 
     llm_response = send_to_llm(LLM_API_URLS["SAJU"], stt_text, meeting_id)
@@ -435,7 +443,11 @@ async def transcribe_saju(
     db.commit()
     db.refresh(new_bot_entry)
 
+    start_time = time.time() #stt 시작 시간
     stt_text = whisper_api_transcribe(file_path)
+    end_time = time.time()
+    print(f"STT 처리 시간: {end_time - start_time:.2f}초")
+        
     save_transcription(output_dir, file.filename, stt_text)
 
     llm_response = send_to_llm(LLM_API_URLS["GYM"], stt_text, meeting_id)
